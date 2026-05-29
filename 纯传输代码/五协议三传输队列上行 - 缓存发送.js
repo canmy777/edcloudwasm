@@ -934,7 +934,7 @@ const manualPipe = async (readable, writable, close) => {
         }
     } catch {close?.(), isClose = true} finally {isReading = false, flushBuffer()}
 };
-const handleSession = async (chunk, state, request, writable, close) => {
+const handleSession = async (chunk, state, request, writable, close, isEarlyData = false) => {
     const allowNeedMore = state.allowNeedMore === true;
     if (allowNeedMore) state.needMore = false;
     let parsedRequest, payload, isSs = false;
@@ -990,7 +990,7 @@ const handleSession = async (chunk, state, request, writable, close) => {
                 writable.send(dnsPack);
             }
         }
-        return close();
+        if (!isEarlyData) return close();
     } else {
         state.tcpSocket = await establishTcpConnection(parsedRequest, request);
         if (!state.tcpSocket) return close();
@@ -1037,7 +1037,7 @@ const handleWebSocketConn = async (webSocket, request) => {
     let processingChain = Promise.resolve();
     const process = async (chunk) => {
         if (state.tcpWriter) return state.tcpWriter(chunk);
-        await handleSession(earlyData ? chunk : new Uint8Array(chunk), state, request, webSocket, close);
+        await handleSession(earlyData ? chunk : new Uint8Array(chunk), state, request, webSocket, close, earlyData !== null);
     };
     if (earlyData) processingChain = processingChain.then(() => process(earlyData).catch(close));
     webSocket.addEventListener("message", event => {processingChain = processingChain.then(() => process(event.data).catch(close))});

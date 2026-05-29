@@ -422,7 +422,7 @@ const manualPipe = async (readable, writable, close) => {
         }
     } catch {close?.(), isClose = true} finally {isReading = false, flushBuffer()}
 };
-const handleSession = async (chunk, state, request, writable, close) => {
+const handleSession = async (chunk, state, request, writable, close, isEarlyData = false) => {
     state.needMore = false;
     const parsed = parseProtocolChunk(chunk);
     parsed.handshake && writable.send(parsed.handshake);
@@ -432,7 +432,7 @@ const handleSession = async (chunk, state, request, writable, close) => {
     if (parsedRequest.isDns) {
         const dnsPack = await dohDnsHandler(payload);
         if (dnsPack?.byteLength) writable.send(dnsPack);
-        return close();
+        if (!isEarlyData) return close();
     } else {
         state.tcpSocket = await establishTcpConnection(parsedRequest, request);
         if (!state.tcpSocket) return close();
@@ -451,7 +451,7 @@ const handleWebSocketConn = async (webSocket, request) => {
     let processingChain = Promise.resolve();
     const process = async (chunk) => {
         if (state.tcpWriter) return state.tcpWriter(chunk);
-        await handleSession(earlyData ? chunk : new Uint8Array(chunk), state, request, webSocket, close);
+        await handleSession(earlyData ? chunk : new Uint8Array(chunk), state, request, webSocket, close, earlyData !== null);
     };
     if (earlyData) processingChain = processingChain.then(() => process(earlyData).catch(close));
     webSocket.addEventListener("message", event => {processingChain = processingChain.then(() => process(event.data).catch(close))});
