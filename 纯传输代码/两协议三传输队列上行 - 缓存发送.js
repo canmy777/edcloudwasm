@@ -8,7 +8,7 @@ const passWordSha224 = '509eece82eb6910bebef9af9496092d3244b6c0d69ef3aaa4b12c565
 const bufferSize = 512 * 1024;
 const startThreshold = 50 * 1024 * 1024;
 const maxChunkLen = 64 * 1024;
-const flushTime = 20;
+const flushTime = 10;
 let concurrency = 4;
 const urlParamCacheLimit = 20;
 const proxyStrategyOrder = ['socks', 'http'];
@@ -351,7 +351,7 @@ const lowerBounds = new Uint16Array([1024, 1536, 2048, 2560, 3072, 3584, 4096, 5
 const manualPipe = async (readable, writable, close) => {
     const safeBufferSize = bufferSize - maxChunkLen, fastFlushOffset = Math.max(bufferSize / flushTime * 2, maxChunkLen * 2);
     let buffer = new ArrayBuffer(bufferSize), spareBuffer = new ArrayBuffer(maxChunkLen), bufferView = new Uint8Array(buffer);
-    let offset = 0, totalBytes = 0, time = 2, timerId = null, resume = null, isReading = false, needsFlush = false, protectFlush = false;
+    let offset = 0, totalBytes = 0, time = 1, timerId = null, resume = null, isReading = false, needsFlush = false, protectFlush = false;
     let globalCount = new Uint32Array(14), globalBytes = new Uint32Array(14);
     let statCount = 0, totalCount = 0, totalGlobalBytes = 0, isClose = false, fastFlush = true;
     const flushBuffer = () => {
@@ -396,7 +396,7 @@ const manualPipe = async (readable, writable, close) => {
                 flushBuffer();
             } else {
                 if (fastFlush) {
-                    time = 2;
+                    time = 1;
                 } else {
                     const idx = chunkLen >= 30720 ? 13 : chunkIdxLookup[chunkLen >> 9];
                     globalCount[idx]++, globalBytes[idx] += chunkLen, statCount++, totalCount++, totalGlobalBytes += chunkLen;
@@ -411,7 +411,7 @@ const manualPipe = async (readable, writable, close) => {
                         score > maxScore && (maxScore = score, maxIdx = i);
                     }
                     if (chunkLen < lowerBounds[maxIdx]) {
-                        totalBytes = 0, time = 2;
+                        totalBytes = 0, time = 1;
                     } else if ((totalBytes += chunkLen) > startThreshold) {
                         time = flushTime;
                     }
